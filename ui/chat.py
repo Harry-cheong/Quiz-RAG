@@ -1,6 +1,5 @@
 """Chat input, answer, source expander."""
 import streamlit as st
-from src.llm import get_llm
 from src.graph import rag_workflow
 
 from .sidebar import start_new_chat
