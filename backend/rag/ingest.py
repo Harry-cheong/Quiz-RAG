@@ -16,12 +16,10 @@ from .config import Config
 def _tokenizer():
     return AutoTokenizer.from_pretrained(Config.EMBEDDING_MODEL)
 
-
 def _cell_text(cell: Optional[object]) -> str:
     if cell is None:
         return ""
     return str(cell).replace("\n", " ").strip()
-
 
 def _table_rows(table) -> List[List[str]]:
     extracted = table.extract() or []
@@ -33,7 +31,6 @@ def _table_rows(table) -> List[List[str]]:
         if any(cells):
             rows.append(cells)
     return rows
-
 
 def hybrid_chunk_pdf(path: str) -> List[Document]:
     text_docs: List[Document] = []
@@ -77,13 +74,11 @@ def hybrid_chunk_pdf(path: str) -> List[Document]:
 
     return text_docs + table_docs
 
-
 def split(docs: List[Document]) -> List[Document]:
     text_docs = [d for d in docs if d.metadata.get("type") != "table_row"]
     table_docs = [d for d in docs if d.metadata.get("type") == "table_row"]
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     return splitter.split_documents(text_docs) + table_docs
-
 
 def truncate_docs(docs: List[Document]) -> List[Document]:
     tok = _tokenizer()
@@ -99,9 +94,13 @@ def truncate_docs(docs: List[Document]) -> List[Document]:
         truncated.append(Document(page_content=text, metadata=doc.metadata))
     return truncated
 
-
-def ingest_pdf(path: str):
+def ingest_pdf(path: str, document_id: Optional[str] = None):
     docs = hybrid_chunk_pdf(path)
+
+    if document_id:
+        for doc in docs:
+            doc.metadata["document_id"] = document_id
+
     splits = truncate_docs(split(docs))
 
     vectorstore = Config().get_chroma()

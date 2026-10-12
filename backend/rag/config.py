@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv()
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
+print(ROOT)
 
 class Config:
     CHROMA_PATH = ROOT / "chroma"
@@ -32,3 +33,7 @@ class Config:
             persist_directory=cls.CHROMA_PATH,
             embedding_function=cls.get_embedder(),
         )
+
+if __name__ == "__main__":
+    c = Config()
+    c.get_chroma()

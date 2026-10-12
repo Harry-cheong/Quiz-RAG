@@ -1,9 +1,9 @@
 """Streamlit entry: `streamlit run app.py`."""
 import streamlit as st
-from src.config import Config
+from backend.rag.config import Config
 
-from ui.chat import render_chat
-from ui.sidebar import render_sidebar
+from demo.ui.chat import render_chat
+from demo.ui.sidebar import render_sidebar
 
 from utils.db import load_chats
 
