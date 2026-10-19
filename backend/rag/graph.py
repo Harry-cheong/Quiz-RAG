@@ -1,7 +1,7 @@
 """LangGraph: retrieve → grade_documents → transform_query / generate."""
 from langgraph.graph import END, StateGraph, START
 
-from .retrieve import get_retriever
+from .retrieve import get_retriever, DatabaseEmptyError
 from .generate import get_answer_chain, format_docs, get_answer, get_grader
 
 from typing import Any, List
@@ -20,7 +20,12 @@ def retrieve(state):
     """Fetch relevant chunks from Chroma. LangGraph owns this step, not Cursor."""
     print("---RETRIEVE---")
     question = state["question"]
-    documents = get_retriever().invoke(question)
+
+    try:
+        documents = get_retriever().invoke(question)
+    except DatabaseEmptyError:
+        documents = []
+    
     return {"documents": documents, "question": question}
 
 def generate(state):
@@ -67,7 +72,6 @@ def answer(state):
 
 def decide_to_generate(state):
     print("---ASSESS GRADED DOCUMENTS---")
-    state["question"]
     filtered_documents = state["documents"]
 
     if not filtered_documents:
@@ -82,6 +86,18 @@ def decide_to_generate(state):
         print("---DECISION: GENERATE---")
         return "generate"
 
+def decide_to_answer_without_context(state):
+    print("---CHECKING IF RELEVANT DOCUMENTS EXIST---")
+
+    if state["documents"]:
+        print("---DECISION: PROCEED WITH RAG---")
+
+        return "rag"
+    else:
+        print("---DECISION: ANSWER WITH GENERAL KNOWLEDGE---")
+
+        return "answer"
+
 @lru_cache(maxsize=1)
 def rag_workflow():
     workflow.add_node("retrieve", retrieve)
@@ -90,7 +106,14 @@ def rag_workflow():
     workflow.add_node("generate", generate)
 
     workflow.add_edge(START, "retrieve")
-    workflow.add_edge("retrieve", "grade_documents")
+    workflow.add_conditional_edges(
+        "retrieve",
+        decide_to_answer_without_context,
+        {
+            "rag": "grade_documents",
+            "answer": "answer_query",
+        }
+    )
     workflow.add_conditional_edges(
         "grade_documents",
         decide_to_generate,

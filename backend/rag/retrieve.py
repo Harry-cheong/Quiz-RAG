@@ -17,6 +17,9 @@ from pydantic import ConfigDict, Field
 
 # Retrieve.py should not depend on splits variable which is temporarily created during ingestion
 
+class DatabaseEmptyError(RuntimeError):
+    pass
+
 def load_indexed_doument():
     data = Config.get_chroma().get(
         include=["documents", "metadatas"]
@@ -33,7 +36,7 @@ def get_retriever():
     docs = load_indexed_doument()
 
     if not docs:
-        raise RuntimeError("The index is empty. Ingest a PDF first.")
+        raise DatabaseEmptyError("The index is empty. Ingest a PDF first.")
     chroma = vectorstore.as_retriever(
         search_kwargs={"k": Config.FETCH_K}
     )
