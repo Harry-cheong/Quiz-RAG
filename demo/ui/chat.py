@@ -1,14 +1,22 @@
 """Chat input, answer, source expander."""
 import streamlit as st
-from backend.rag.graph import rag_workflow
+import requests
 
 from .sidebar import start_new_chat
+
+BASE_URL = "http://localhost:8000"
 
 def _title_from_prompt(prompt: str) -> str:
     title = " ".join(prompt.split())
     if len(title) <= 36:
         return title
     return title[:36].rstrip() + "…"
+
+def send_prompt(question):
+    response = requests.post(f"{BASE_URL}/question", json={"question": question}, timeout=60)
+
+    response.raise_for_status()
+    return response.json()
 
 def render_chat():
     active = st.session_state.get("active_chat")
@@ -53,7 +61,7 @@ def render_chat():
         with st.chat_message("assistant"):
             with st.spinner("Generating response...", show_time=True):
                 # response = get_llm().invoke(prompt)
-                response = rag_workflow().invoke({"question": prompt})
-            text = response["generation"]
+                response = send_prompt(prompt)
+            text = response["response"]["generation"]
             st.write(text)
         st.session_state.messages[active].append({"role": "assistant", "content": text})

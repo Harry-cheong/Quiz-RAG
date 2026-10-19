@@ -1,8 +1,6 @@
 """Conversation list, new chat, delete — chatbot-style sidebar."""
 import uuid
-
 import streamlit as st
-
 
 def _set_active_chat(chat_id: str) -> None:
     st.session_state.active_chat = chat_id
