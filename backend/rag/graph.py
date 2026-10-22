@@ -8,11 +8,17 @@ from typing import Any, List
 from typing_extensions import TypedDict
 from functools import lru_cache
 
+from uuid import UUID
+
 class GraphState(TypedDict):
     """State passed between LangGraph nodes."""
     question: str
     generation: str
     documents: List[Any]
+
+    """Filter Criterias"""
+    document_ids: List[UUID]
+    folder_ids: List[UUID]
 
 workflow = StateGraph(GraphState)
 
@@ -20,9 +26,11 @@ def retrieve(state):
     """Fetch relevant chunks from Chroma. LangGraph owns this step, not Cursor."""
     print("---RETRIEVE---")
     question = state["question"]
+    document_ids = state["document_ids"]
+    folder_ids = state["folder_ids"]
 
     try:
-        documents = get_retriever().invoke(question)
+        documents = get_retriever(document_ids, folder_ids).invoke(question)
     except DatabaseEmptyError:
         documents = []
     

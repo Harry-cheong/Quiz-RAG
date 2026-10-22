@@ -2,13 +2,13 @@ import json
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import uuid4, UUID
 from shutil import copyfileobj
+from typing import List
 
 from rag.graph import rag_workflow
 from rag.ingest import ingest_pdf
-from rag.retrieve import get_retriever
 from rag.config import Config
 
 router = APIRouter()
@@ -18,6 +18,8 @@ FOLDERS_PATH = UPLOAD_DIR / "folders.json"
 
 class RAGRequest(BaseModel):
     question: str
+    folder_ids: List[UUID] = Field(default_factory=list)
+    document_ids: List[UUID] = Field(default_factory=list)
 
 class FolderRequest(BaseModel):
     name: str
@@ -58,7 +60,13 @@ def _folder_or_404(folder_id: str, folders=None):
 
 @router.post("/question")
 def rag_answer(answer: RAGRequest):
-    response = rag_workflow().invoke({"question": answer.question})
+    response = rag_workflow().invoke(
+        {
+            "question": answer.question,
+            "document_ids": answer.document_ids,
+            "folder_ids": answer.folder_ids,
+        }
+    )
     return {"response": response}
 
 @router.get("/folders")
@@ -118,7 +126,6 @@ def delete_folder(folder_id: UUID, db=Depends(get_vectorstore)):
 
     if deleted_ids:
         db.delete(ids=deleted_ids)
-        get_retriever.cache_clear()
 
     # Delete the document
     for document_id in document_ids:
@@ -162,8 +169,6 @@ def ingest(file: UploadFile = File(...), metadata: str = Form(...)):
     except Exception as exc:
         saved_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Document ingestion failed: {exc}") from exc
-
-    get_retriever.cache_clear()
 
     return {
         "document_id": document_id,
@@ -225,7 +230,6 @@ def delete_document(document_id: UUID, db=Depends(get_vectorstore)):
 
     if chunk_count:
         db.delete(where=where)
-        get_retriever.cache_clear()
 
     file_deleted = pdf_path.is_file()
 

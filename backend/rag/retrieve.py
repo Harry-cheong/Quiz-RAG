@@ -3,7 +3,7 @@ from .config import Config
 
 from collections import defaultdict
 from typing import Any
-from functools import lru_cache
+from uuid import UUID
 
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
@@ -20,26 +20,56 @@ from pydantic import ConfigDict, Field
 class DatabaseEmptyError(RuntimeError):
     pass
 
-def load_indexed_doument():
-    data = Config.get_chroma().get(
-        include=["documents", "metadatas"]
-    )
+def _selection_filter(folder_ids, document_ids):
+    clauses = []
+
+    if folder_ids:
+        clauses.append(
+            {
+                "folder_id": {
+                    "$in": [str(UUID(str(folder_id))) for folder_id in folder_ids]
+                }
+            }
+        )
+    if document_ids:
+        clauses.append(
+            {
+                "document_id": {
+                    "$in": [UUID(str(document_id)).hex for document_id in document_ids]
+                }
+            }
+        )
+
+    if not clauses:
+        return None
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$or": clauses}
+
+
+def load_indexed_documents(folder_ids, document_ids):
+    where = _selection_filter(folder_ids, document_ids)
+    get_kwargs = {"include": ["documents", "metadatas"]}
+    if where is not None:
+        get_kwargs["where"] = where
+    data = Config.get_chroma().get(**get_kwargs)
 
     return [
         Document(page_content=text, metadata=metadata or {})
         for text, metadata in zip(data["documents"], data["metadatas"])
     ]
 
-@lru_cache(maxsize=1)
-def get_retriever():
+def get_retriever(document_ids, folder_ids):
     vectorstore = Config.get_chroma()
-    docs = load_indexed_doument()
+    docs = load_indexed_documents(folder_ids, document_ids)
 
     if not docs:
-        raise DatabaseEmptyError("The index is empty. Ingest a PDF first.")
-    chroma = vectorstore.as_retriever(
-        search_kwargs={"k": Config.FETCH_K}
-    )
+        raise DatabaseEmptyError("No indexed documents match the selected sources.")
+    search_kwargs = {"k": Config.FETCH_K}
+    where = _selection_filter(folder_ids, document_ids)
+    if where is not None:
+        search_kwargs["filter"] = where
+    chroma = vectorstore.as_retriever(search_kwargs=search_kwargs)
     bm25 = BM25Retriever.from_documents(
         docs,
         k=Config.FETCH_K,
