@@ -32,7 +32,7 @@ def _delete_chat(chat_id: str) -> None:
     if st.session_state.get("active_chat") == chat_id:
         st.session_state.active_chat = st.session_state.chat_order[0]
 
-def render_sidebar() -> None:
+def render_sidebar(documents_page=None) -> None:
     with st.sidebar:
         st.logo(":material/auto_awesome:", size="large")
         st.header("RAG Bot")
@@ -45,6 +45,14 @@ def render_sidebar() -> None:
             width="stretch",
             on_click=start_new_chat,
         )
+
+        if documents_page is not None:
+            st.page_link(
+                documents_page,
+                label="Manage Documents",
+                icon=":material/description:",
+                width="stretch",
+            )
 
         order = st.session_state.get("chat_order") or list(st.session_state.messages)
         history_ids = [
@@ -63,6 +71,7 @@ def render_sidebar() -> None:
                     wrap=False,
                     vertical_alignment="center",
                 )
+                
                 with row:
                     st.button(
                         name,

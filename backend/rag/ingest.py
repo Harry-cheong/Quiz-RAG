@@ -94,12 +94,21 @@ def truncate_docs(docs: List[Document]) -> List[Document]:
         truncated.append(Document(page_content=text, metadata=doc.metadata))
     return truncated
 
-def ingest_pdf(path: str, document_id: Optional[str] = None):
+def ingest_pdf(
+    path: str,
+    document_id: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    filename: Optional[str] = None,
+):
     docs = hybrid_chunk_pdf(path)
 
-    if document_id:
-        for doc in docs:
+    for doc in docs:
+        if document_id:
             doc.metadata["document_id"] = document_id
+        if folder_id:
+            doc.metadata["folder_id"] = folder_id
+        if filename:
+            doc.metadata["filename"] = filename
 
     splits = truncate_docs(split(docs))
 
