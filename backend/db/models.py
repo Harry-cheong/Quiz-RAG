@@ -16,6 +16,8 @@ class Question(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     topic: Mapped[str] = mapped_column(Text, nullable=False)
     difficulty: Mapped[str] = mapped_column(Text, nullable=False)
+    labels: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     attempts: Mapped[list["Attempt"]] = relationship(
         back_populates="question",

@@ -3,8 +3,14 @@ CREATE TABLE IF NOT EXISTS questions (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT NOT NULL,
     topic TEXT NOT NULL,
-    difficulty TEXT NOT NULL
+    difficulty TEXT NOT NULL,
+    source TEXT,
+    labels TEXT
 );
+
+-- Add these columns when upgrading a database created with the older schema.
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS labels TEXT;
 
 -- child table for attempts
 CREATE TABLE IF NOT EXISTS attempts (
