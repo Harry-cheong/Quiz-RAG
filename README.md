@@ -1,20 +1,23 @@
-# RAG Bot
+# Leetcode Question RAG Bot
 
-A document question-answering app with a Streamlit chat UI and a FastAPI backend. The backend retrieves relevant document chunks from Chroma and uses an LLM to generate an answer.
+An application that helps to organise attempted Leetcode questions by topics and allows users to create their own list. A RAG system works in the background to recommend new questions based on questions attempted.
 
 ## Project layout
 
 ```text
 backend/
   main.py             # FastAPI application
-  api/chat.py         # Question and document endpoints
-  rag/                # Ingestion, retrieval, RAG graph, and LLM setup
-demo/
-  app.py              # Streamlit entry point
-  ui/                 # Chat and sidebar components
-  utils/              # Chat UI utilities
-data/                 # Uploaded PDF files (created as needed; gitignored)
-chroma/               # Persistent Chroma index (gitignored)
+  docker-compose.yml  # Docker Compose File
+  api/
+    leetcode.py       # HTTP Endpoints to create, search for questions
+    health.py         # HTTP Endpoints for application health
+  database/
+    schema.sql        # Initialised schema
+  db/
+    connect.py        # Utility Functions to connect to database
+    models.py         # ORM Models
+  test/
+    test_leetcode.py  # Unit Testing for leetcode.py endpoints
 ```
 
 ## Setup
@@ -40,10 +43,3 @@ uvicorn main:app --reload
 ```
 
 The API listens at `http://localhost:8000`; interactive API documentation is at <http://localhost:8000/docs>.
-
-Start the Streamlit UI in a second terminal from the repository root:
-
-```bash
-cd demo
-streamlit run app.py
-```
