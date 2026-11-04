@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel, AwareDatetime
@@ -9,6 +9,8 @@ from typing import Literal, Annotated
 
 from db.connect import SessionLocal
 from db.models import Attempt, Question
+
+from auth.dependencies import get_user
 
 router = APIRouter()
 
@@ -30,10 +32,15 @@ def _serialize_attempt(attempt: Attempt) -> dict:
     }
 
 @router.get("/{question_id}/attempts")
-def get_attempts(question_id: int, db: Session = Depends(get_db)):
+def get_attempts(question_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     attempts = db.scalars(
         select(Attempt)
-        .where(Attempt.question_id == question_id)
+        .where(
+            and_(
+                Attempt.question_id == question_id,
+                Attempt.user_id == user_id
+            )
+        )
         .order_by(Attempt.created_at.desc())
     ).all()
 
@@ -53,7 +60,7 @@ class SearchRequest(BaseModel):
     # question db
     name: str | None = None
     topic: str | None = None
-    difficulty: Literal["Easy", "Medium", "Hard"] | None = None
+    difficulty: str | None = None
 
     # attempt db
     proficiency: Literal["Excellent", "Good", "Poor"] | None = None
@@ -61,9 +68,10 @@ class SearchRequest(BaseModel):
 
 
 @router.get("/search")
-def search_question(search_request: Annotated[SearchRequest, Query()], db: Session=Depends(get_db)):
-    search_stmt = select(Question).options(selectinload(Question.attempts))
-
+def search_question(search_request: Annotated[SearchRequest, Query()], db: Session=Depends(get_db), user_id: int = Depends(get_user)):
+    search_stmt = select(Question).options(
+        selectinload(Question.attempts.and_(Attempt.user_id == user_id))
+    )
     if search_request.name is not None:
         search_stmt = search_stmt.where(Question.name.ilike(f"%{search_request.name}%"))
     if search_request.topic is not None:
@@ -74,7 +82,10 @@ def search_question(search_request: Annotated[SearchRequest, Query()], db: Sessi
     if search_request.proficiency:
         latest_proficiency = (
             select(Attempt.proficiency)
-            .where(Attempt.question_id == Question.id)
+            .where(
+                Attempt.question_id == Question.id,
+                Attempt.user_id == user_id,
+            )
             .order_by(Attempt.created_at.desc(), Attempt.id.desc())
             .limit(1)
             .scalar_subquery()
@@ -89,7 +100,8 @@ def search_question(search_request: Annotated[SearchRequest, Query()], db: Sessi
 
         search_stmt = search_stmt.where(Question.attempts.any(
             and_(Attempt.created_at >= day_start, 
-                Attempt.created_at < next_day)
+                Attempt.created_at < next_day,
+                Attempt.user_id == user_id)
         ))
 
     questions = db.scalars(search_stmt.order_by(Question.id)).all()

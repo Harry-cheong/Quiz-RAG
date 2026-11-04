@@ -24,9 +24,8 @@ database_connect = types.ModuleType("db.connect")
 database_connect.SessionLocal = lambda: None
 sys.modules.setdefault("db.connect", database_connect)
 
-from api.leetcode import get_db, router  # noqa: E402
+from api.questions import get_db, router  # noqa: E402
 from db.models import Attempt, Base, Question  # noqa: E402
-
 
 # SQLite only autogenerates row IDs for an INTEGER PRIMARY KEY. The app uses
 # BigInteger IDs for PostgreSQL, so render those as INTEGER in this test DB.
@@ -35,7 +34,7 @@ def _compile_bigint_for_sqlite(_type, _compiler, **_kwargs):
     return "INTEGER"
 
 
-class LeetCodeEndpointTests(unittest.TestCase):
+class QuestionEndpointTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine(
             "sqlite://",

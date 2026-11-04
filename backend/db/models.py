@@ -36,6 +36,11 @@ class Attempt(Base):
         ForeignKey("questions.id", ondelete="CASCADE"),
         nullable=False,
     )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, 
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     proficiency: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -45,3 +50,11 @@ class Attempt(Base):
     )
 
     question: Mapped[Question] = relationship(back_populates="attempts")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    username: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    hashed_pwd: Mapped[str] = mapped_column(Text, nullable=False)
