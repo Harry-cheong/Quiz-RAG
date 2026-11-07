@@ -1,4 +1,3 @@
-"""Migrate Existing Leetcode Questions from SQLite in personal To-Do application  To Postgres Database"""
 import argparse
 from sqlalchemy import create_engine, String, ForeignKey, Integer, select, URL
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column, relationship
@@ -24,8 +23,7 @@ SRCPATH_DB = os.getenv("SRC_DB")
 engine = create_engine(URL.create("sqlite", database=SRCPATH_DB))
 SQLSession = sessionmaker(bind=engine)
 
-# Old SQLite Schema
-# Schema is designed for a To-Do Log where each entry holds all the items of the same category and the same creation time
+
 class Base(DeclarativeBase):
     pass
 

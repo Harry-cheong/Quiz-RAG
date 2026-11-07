@@ -17,12 +17,26 @@ CREATE TABLE IF NOT EXISTS questions (
     topic TEXT,
     difficulty TEXT NOT NULL,
     source TEXT,
-    labels TEXT
+    labels TEXT,
+    UNIQUE (name)
 );
 
--- Add these columns when upgrading a database created with the older schema.
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS source TEXT;
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS labels TEXT;
+-- lists table
+CREATE TABLE IF NOT EXISTS lists (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, name)
+);
+
+-- list question table
+CREATE TABLE IF NOT EXISTS list_questions (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    question_id BIGINT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    UNIQUE (list_id, question_id)
+);
 
 -- child table for attempts
 CREATE TABLE IF NOT EXISTS attempts (

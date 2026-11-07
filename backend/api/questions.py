@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, and_
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
+from sqlalchemy import select, and_, insert
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel, AwareDatetime
+import csv
+import io
+from pathlib import Path
 
 from datetime import timedelta
 
 from typing import Literal, Annotated
 
 from db.connect import SessionLocal
-from db.models import Attempt, Question
+from db.models import Attempt, Question, QuestionList, QuestionListItem
 
 from auth.dependencies import get_user
 
@@ -109,10 +112,10 @@ def search_question(search_request: Annotated[SearchRequest, Query()], db: Sessi
     return questions
 
 @router.get("/all")
-def get_all_questions(db: Session = Depends(get_db)):
+def get_all_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     questions = db.scalars(
         select(Question)
-        .options(selectinload(Question.attempts))
+        .options(selectinload(Question.attempts.and_(Attempt.user_id == user_id)))
         .order_by(Question.id)
     ).all()
 
@@ -141,7 +144,7 @@ class QuestionRequest(BaseModel):
 
 
 @router.post("/new/question", status_code=201)
-def add_new_question(question_request: QuestionRequest, db: Session = Depends(get_db)):
+def add_new_question(question_request: QuestionRequest, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     # atomic transaction
     with db.begin():
         question = Question(
@@ -152,6 +155,7 @@ def add_new_question(question_request: QuestionRequest, db: Session = Depends(ge
 
         question.attempts.append(
             Attempt(
+                user_id=user_id,
                 question_id=question.id,
                 body=question_request.body,
                 proficiency=question_request.proficiency,
@@ -162,3 +166,97 @@ def add_new_question(question_request: QuestionRequest, db: Session = Depends(ge
         db.flush() # Inserts both rows and populates their generated IDs
 
     return {"question_id": question.id, "attempt_id": question.attempts[0].id}
+
+@router.post("/new/list")
+async def add_list(list_name: str, file: UploadFile = File(...), db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+    if not file.filename or Path(file.filename).suffix.lower() != ".csv":
+        raise HTTPException(status_code=415, detail="Only CSV files are supported")
+
+    contents = await file.read()
+    rows = csv.DictReader(io.StringIO(contents.decode("utf-8")))
+
+    try:
+        questions = [
+            {
+                "name": f"#{row['ID']} {row['Title']}",
+                "difficulty": row["Difficulty"]
+            } for row in rows
+        ]
+    except:
+        raise HTTPException(status_code=500, detail="Invalid Table Column Names")
+
+    # Deduplicate names 
+    names = list(dict.fromkeys(q["name"] for q in questions))
+
+    with db.begin():
+        existing_questions = db.scalars(select(Question.name).where(Question.name.in_(names))).all()
+        questions_by_name = {q.name: q for q in existing_questions}
+
+        # add new questions
+        for q in questions:
+            if q["name"] not in questions_by_name:
+                question = Question(
+                    name=q["name"],
+                    difficulty=q["difficulty"],
+                )
+                db.add(question)
+                questions_by_name[q["name"]] = question
+                
+        # add new list
+        new_list = QuestionList(
+            user_id = user_id,
+            name=list_name,
+        )
+        db.add(new_list)
+
+        db.flush() # assign new IDs
+
+        # add list items
+        db.add_all(
+            [QuestionListItem(
+                user_id=user_id,
+                list_id=new_list.id,
+                question_id=questions_by_name[name].id
+            ) for name in names]
+        )
+
+    return {"count": len(questions), "questions": questions}
+
+@router.get("/mylists")
+def get_my_list(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+    questions_lists = db.scalars(select(QuestionList).where(QuestionList.user_id==user_id)).all()
+
+    return [
+        {
+            "name": l.name,
+            "id": l.id,
+        }
+        for l in questions_lists
+    ]
+
+@router.get("/list/{id}")
+def get_list(id: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+    question_ids = db.scalars(
+        select(QuestionListItem.question_id)
+        .where(
+            and_(
+                QuestionListItem.list_id == id,
+                QuestionListItem.user_id == user_id,
+            )
+        )
+        .order_by(QuestionListItem.question_id)
+    ).all()
+
+    questions = db.scalars(select(Question).where(Question.id.in_(question_ids))).all()
+
+    return [
+        {
+            "id": question.id,
+            "name": question.name,
+            "topic": question.topic,
+            "difficulty": question.difficulty,
+        }
+        for question in questions
+    ]
+
+    
